@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../services/apiClient';
@@ -16,9 +17,12 @@ import { Product } from '../types';
 const HomeScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const navigation = useNavigation<any>();
   const [visibleItems, setVisibleItems] = useState<Record<number, boolean>>({});
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
     const map: Record<number, boolean> = {};
     viewableItems.forEach((v) => {
@@ -30,6 +34,16 @@ const HomeScreen = () => {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 350);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [searchQuery]);
 
   const fetchProducts = async () => {
     try {
@@ -63,6 +77,12 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
+  const displayedProducts = useMemo(() => {
+    if (!debouncedQuery) return products;
+    const q = debouncedQuery.toLowerCase();
+    return products.filter((p) => p.title?.toLowerCase().includes(q));
+  }, [products, debouncedQuery]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -74,14 +94,34 @@ const HomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.searchContainer}>
+        <TextInput
+          placeholder="Search products..."
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={styles.searchInput}
+          returnKeyType="search"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <FlatList
-        data={products}
+        data={displayedProducts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         onViewableItemsChanged={onViewableItemsChanged.current}
         viewabilityConfig={viewabilityConfig.current}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>{loading ? 'Loading products...' : 'No results found.'}</Text>
+          </View>
+        )}
       />
     </SafeAreaView>
   );
@@ -92,6 +132,10 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8f9fa' },
   loadingText: { marginTop: 10, fontSize: 16, color: '#666' },
   listContent: { padding: 10 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginBottom: 8 },
+  searchInput: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, fontSize: 14, color: '#111', elevation: 1 },
+  clearButton: { marginLeft: 8 },
+  clearText: { color: '#2563eb', fontWeight: '600' },
   item: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -106,6 +150,8 @@ const styles = StyleSheet.create({
   },
   imageContainer: { width: 80, height: 80, borderRadius: 8, marginRight: 15, overflow: 'hidden' },
   image: { width: 80, height: 80 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: '#6b7280', fontSize: 16 },
   textContainer: { flex: 1, justifyContent: 'center' },
   title: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 5 },
   price: { fontSize: 18, fontWeight: 'bold', color: '#007BFF', marginBottom: 5 },
