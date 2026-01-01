@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,15 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../services/apiClient';
 import { Product } from '../types';
+import FilterContext from '../context/FilterContext';
+import { SortKey } from '../types/filters';
 
 const HomeScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [sortOption, setSortOption] = useState<string>('');
+  const { searchQuery, setSearchQuery, selectedCategory, setSelectedCategory, sortOption, setSortOption } = useContext(FilterContext);
   const [showSortOptions, setShowSortOptions] = useState(false);
   const [showCategoryOptions, setShowCategoryOptions] = useState(false);
   const navigation = useNavigation<any>();
@@ -111,7 +111,7 @@ const HomeScreen = () => {
     return result;
   }, [products, debouncedQuery, selectedCategory, sortOption]);
 
-  function labelForSort(key: string) {
+  function labelForSort(key: SortKey) {
     switch (key) {
       case 'price_asc':
         return 'Price ↑';
@@ -163,13 +163,13 @@ const HomeScreen = () => {
       {showSortOptions && (
         <View style={styles.optionsPanel}>
           {[
-            { key: '', label: 'None' },
-            { key: 'price_asc', label: 'Price: Low → High' },
-            { key: 'price_desc', label: 'Price: High → Low' },
-            { key: 'name_asc', label: 'Name: A → Z' },
-            { key: 'name_desc', label: 'Name: Z → A' },
+            { key: '' as SortKey, label: 'None' },
+            { key: 'price_asc' as SortKey, label: 'Price: Low → High' },
+            { key: 'price_desc' as SortKey, label: 'Price: High → Low' },
+            { key: 'name_asc' as SortKey, label: 'Name: A → Z' },
+            { key: 'name_desc' as SortKey, label: 'Name: Z → A' },
           ].map((o) => (
-            <TouchableOpacity key={o.key || 'none'} style={styles.optionItem} onPress={() => { setSortOption(o.key); setShowSortOptions(false); }}>
+            <TouchableOpacity key={String(o.key) || 'none'} style={styles.optionItem} onPress={() => { setSortOption(o.key as SortKey); setShowSortOptions(false); }}>
               <Text style={styles.optionText}>{o.label}</Text>
             </TouchableOpacity>
           ))}
