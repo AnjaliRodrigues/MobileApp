@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
+  TouchableOpacity,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../services/apiClient';
@@ -15,7 +16,7 @@ import { Product } from '../types';
 const HomeScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [visibleItems, setVisibleItems] = useState<Record<number, boolean>>({});
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
@@ -42,7 +43,11 @@ const HomeScreen = () => {
   };
 
   const renderItem = ({ item }: { item: Product }) => (
-    <View style={styles.item}>
+    <TouchableOpacity
+      style={styles.item}
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('Detail', { product: item })}
+    >
       <View style={styles.imageContainer}>
         {visibleItems[item.id] ? (
           <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
@@ -52,10 +57,10 @@ const HomeScreen = () => {
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.price}>${item.price}</Text>
+        <Text style={styles.price}>₹{item.price}</Text>
         <Text style={styles.category}>{item.category}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   if (loading) {
