@@ -19,6 +19,11 @@ const HomeScreen = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [sortOption, setSortOption] = useState<string>('');
+  const [showSortOptions, setShowSortOptions] = useState(false);
+  const [showCategoryOptions, setShowCategoryOptions] = useState(false);
   const navigation = useNavigation<any>();
   const [visibleItems, setVisibleItems] = useState<Record<number, boolean>>({});
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 });
@@ -33,7 +38,18 @@ const HomeScreen = () => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const resp = await apiClient.get('/products/categories');
+      const list = Array.isArray(resp.data) ? resp.data : [];
+      setCategories(['All', ...list]);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+    }
+  };
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -78,10 +94,37 @@ const HomeScreen = () => {
   );
 
   const displayedProducts = useMemo(() => {
-    if (!debouncedQuery) return products;
-    const q = debouncedQuery.toLowerCase();
-    return products.filter((p) => p.title?.toLowerCase().includes(q));
-  }, [products, debouncedQuery]);
+    let result = products.slice();
+    if (selectedCategory && selectedCategory !== 'All') {
+      result = result.filter((p) => p.category === selectedCategory);
+    }
+    if (debouncedQuery) {
+      const q = debouncedQuery.toLowerCase();
+      result = result.filter((p) => p.title?.toLowerCase().includes(q));
+    }
+    // apply sorting
+    if (sortOption === 'price_asc') result.sort((a, b) => a.price - b.price);
+    else if (sortOption === 'price_desc') result.sort((a, b) => b.price - a.price);
+    else if (sortOption === 'name_asc') result.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortOption === 'name_desc') result.sort((a, b) => b.title.localeCompare(a.title));
+
+    return result;
+  }, [products, debouncedQuery, selectedCategory, sortOption]);
+
+  function labelForSort(key: string) {
+    switch (key) {
+      case 'price_asc':
+        return 'Price ↑';
+      case 'price_desc':
+        return 'Price ↓';
+      case 'name_asc':
+        return 'Name A-Z';
+      case 'name_desc':
+        return 'Name Z-A';
+      default:
+        return 'None';
+    }
+  }
 
   if (loading) {
     return (
@@ -109,6 +152,38 @@ const HomeScreen = () => {
           </TouchableOpacity>
         )}
       </View>
+      <View style={styles.controlsRow}>
+        <TouchableOpacity style={styles.control} onPress={() => { setShowSortOptions((s) => !s); setShowCategoryOptions(false); }}>
+          <Text style={styles.controlText}>{sortOption ? `Sort: ${labelForSort(sortOption)}` : 'Sort'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.control} onPress={() => { setShowCategoryOptions((s) => !s); setShowSortOptions(false); }}>
+          <Text style={styles.controlText}>{selectedCategory ?? 'Category'}</Text>
+        </TouchableOpacity>
+      </View>
+      {showSortOptions && (
+        <View style={styles.optionsPanel}>
+          {[
+            { key: '', label: 'None' },
+            { key: 'price_asc', label: 'Price: Low → High' },
+            { key: 'price_desc', label: 'Price: High → Low' },
+            { key: 'name_asc', label: 'Name: A → Z' },
+            { key: 'name_desc', label: 'Name: Z → A' },
+          ].map((o) => (
+            <TouchableOpacity key={o.key || 'none'} style={styles.optionItem} onPress={() => { setSortOption(o.key); setShowSortOptions(false); }}>
+              <Text style={styles.optionText}>{o.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {showCategoryOptions && (
+        <View style={styles.optionsPanel}>
+          {categories.map((c) => (
+            <TouchableOpacity key={c} style={styles.optionItem} onPress={() => { setSelectedCategory(c); setShowCategoryOptions(false); }}>
+              <Text style={styles.optionText}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
       <FlatList
         data={displayedProducts}
         keyExtractor={(item) => item.id.toString()}
@@ -136,6 +211,12 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, fontSize: 14, color: '#111', elevation: 1 },
   clearButton: { marginLeft: 8 },
   clearText: { color: '#2563eb', fontWeight: '600' },
+  controlsRow: { flexDirection: 'row', paddingHorizontal: 10, marginBottom: 8 },
+  control: { backgroundColor: '#fff', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, marginRight: 8, elevation: 1 },
+  controlText: { color: '#111', fontWeight: '600' },
+  optionsPanel: { backgroundColor: '#fff', marginHorizontal: 10, borderRadius: 8, elevation: 2, paddingVertical: 6, marginBottom: 8 },
+  optionItem: { paddingVertical: 10, paddingHorizontal: 12 },
+  optionText: { color: '#0f1724' },
   item: {
     flexDirection: 'row',
     backgroundColor: '#fff',
